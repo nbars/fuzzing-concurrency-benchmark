@@ -110,20 +110,22 @@ class DockerRunner(EvaluationRunner):
             cpus = []
             try:
                 cpus = [
-                    str(free_cpus.pop())
-                    for _ in range(self._num_processes_per_container)
+                    str(free_cpus.pop(0))
+                    for _ in range(self._num_processes_per_container + 1)  # inclusive
                 ]
             except:
                 # We ran out of cpus
-                pass
+                assert not free_cpus
 
             cpus_flag = ""
             if cpus:
                 cpus_flag = ",".join(cpus)
-                cpus_flag = f"--cpus={cpus_flag}"
+                cpus_flag = f"--cpuset-cpus={cpus_flag}"
 
+            cmd = f"docker run -d {cpus_flag} -t {self._image_name} bash"
+            log.info(f"Spawning container: {cmd}")
             output = subprocess.check_output(
-                f"docker run -d {cpus_flag} -t {self._image_name} bash",
+                cmd,
                 shell=True,
                 encoding="utf8",
             ).strip()
@@ -205,7 +207,13 @@ class DockerRunner(EvaluationRunner):
         super().purge()
         if self._spawned_container_ids:
             for c in self._spawned_container_ids:
-                subprocess.run(f"docker rm -f {c}", shell=True, check=False)
+                subprocess.run(
+                    f"docker rm -f {c}",
+                    shell=True,
+                    check=False,
+                    stderr=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                )
 
 
 class DefaultDockerRunner(DockerRunner):
