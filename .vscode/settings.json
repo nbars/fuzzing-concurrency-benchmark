@@ -1,0 +1,14 @@
+{
+    "files.exclude": {
+        "storage/": true,
+        "runner/plain/*/fuzzing": true,
+    },
+    "search.exclude": {
+        "storage/": true,
+        "runner/plain/*/fuzzing": true,
+    },
+    "files.watcherExclude": {
+        "storage/": true,
+        "runner/plain/*/fuzzing": true,
+    },
+}
