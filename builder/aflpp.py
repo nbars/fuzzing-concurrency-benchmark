@@ -11,11 +11,6 @@ class AflConfig:
         self._cc = build_root / "afl-clang-fast"
         self._cxx = build_root / "afl-clang-fast++"
         self._afl_fuzz = build_root / "afl-fuzz"
-        for attr, attr_val in self.__dict__.items():
-            if isinstance(attr_val, Path):
-                assert (
-                    attr_val.exists()
-                ), f"Attribute {attr} does points to a non existing file {attr_val}"
 
     def root(self) -> Path:
         return self._root
@@ -28,6 +23,13 @@ class AflConfig:
 
     def afl_fuzz(self) -> Path:
         return self._afl_fuzz
+
+    def validate(self):
+        for attr, attr_val in self.__dict__.items():
+            if isinstance(attr_val, Path):
+                assert (
+                    attr_val.exists()
+                ), f"Attribute {attr} does points to a non existing file {attr_val}"
 
 
 class AflppBuilder(Builder):
@@ -56,7 +58,9 @@ class AflppBuilder(Builder):
         return True
 
     def afl_config(self) -> AflConfig:
-        return AflConfig(self._src_dir)
+        c = AflConfig(self._src_dir)
+        c.validate()
+        return c
 
     def target_name(self) -> str:
         return "aflpp-fuzzer"

@@ -13,7 +13,7 @@ from logger import get_logger, setup_root_logger
 from pathlib import Path
 
 from runner.base import EvaluationRunner
-from runner.plain import PlainRunner
+from runner.plain import PlainAflRunner
 
 setup_root_logger()
 log = get_logger()
@@ -58,12 +58,8 @@ def build_targets(afl_config: AflConfig) -> list[BuildArtifact]:
             builder.build(False)
             targets_artifacts.append(builder.build_artifact())
         except:
-            log.error(
-                f"Error while building {builder.target_name()}. The work directory if the target will be automatically purged on next build.",
-                exc_info=True,
-            )
             builder.set_purge_on_next_build_flag()
-            exit(1)
+            raise RuntimeError(f"Error while building {builder.target_name()}. The work directory if the target will be automatically purged on next build.")
     return targets_artifacts
 
 
@@ -102,11 +98,8 @@ def prepare_runners(
                 try:
                     runner.prepare(purge=True)
                 except:
-                    log.error(
-                        f"Failed to prepare runner {runner}. Retry on next prepare.",
-                        exc_info=True,
-                    )
                     runner.set_purge_on_next_prepare_flag()
+                    raise RuntimeError(f"Failed to prepare runner {runner}. Retry on next prepare.")
                 runners.append(runner)
     return runners
 
@@ -186,9 +179,9 @@ def main():
         f"We are going to perform {len(job_cnt_configurations)} different configurations with a timeout of {timeout_s} seconds"
     )
 
-    from runner import PlainRunner
+    from runner import PlainAflRunner, DockerRunner
 
-    enabled_runner_types: list[type[EvaluationRunner]] = [PlainRunner]
+    enabled_runner_types: list[type[EvaluationRunner]] = [PlainAflRunner, DockerRunner]
 
     afl_config = build_aflpp()
     targets_artifacts = build_targets(afl_config)

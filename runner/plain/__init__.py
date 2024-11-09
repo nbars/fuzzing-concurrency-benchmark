@@ -16,7 +16,7 @@ from logger import get_logger
 log = get_logger()
 
 
-class PlainRunner(EvaluationRunner):
+class PlainAflRunner(EvaluationRunner):
 
     def __init__(
         self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
@@ -33,6 +33,10 @@ class PlainRunner(EvaluationRunner):
 
     def start(self) -> None:
         log.info(f"Results are going to be stored in {self.work_dir()}")
+
+        out = subprocess.check_output("pgrep afl-fuzz || true", shell=True, encoding="utf8").strip()
+        if out:
+            raise RuntimeError(f"Looks like other afl-fuzz processes are running: {out}")
 
         env = {
             "AFL_NO_UI": "1",
@@ -74,8 +78,12 @@ class PlainRunner(EvaluationRunner):
             if any(status):
                 log.error(f"{len(status)} job(s) terminated prematurely.")
                 for j in jobs:
-                    log.error(f"Sending SIGINT to {j.pid}")
+                    log.error(f"Sending SIGTERM to {j.pid}")
                     j.send_signal(signal.SIGTERM)
+                    log.error(f"Waiting for {j.pid}")
+                    j.wait()
+                # afl++ sometimes fails to kill their childs :)
+                subprocess.run("pkill -9 afl-fuzz", shell=True, check=False)
                 raise RuntimeError(
                     f"Some jobs seem to have terminated prematurely. OOM? Check the logs at {self.work_dir()} for details"
                 )
@@ -83,11 +91,13 @@ class PlainRunner(EvaluationRunner):
             if time.monotonic() > deadline:
                 log.info("Timeout exceeded, terminating jobs")
                 for j in jobs:
-                    log.info(f"Sending SIGINT to {j.pid}")
+                    log.info(f"Sending SIGTERM to {j.pid}")
                     j.send_signal(signal.SIGTERM)
                     log.info(f"Waiting for {j.pid}")
                     j.wait()
                     log.info(f"Target {j.pid} terminate")
+                # afl++ sometimes fails to kill their childs :)
+                subprocess.run("pkill -9 afl-fuzz", shell=True, check=False)
                 break
 
     def stats_files_paths(self) -> t.List[Path]:

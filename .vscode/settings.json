@@ -1,14 +1,18 @@
 {
     "files.exclude": {
         "storage/": true,
-        "runner/plain/*/fuzzing": true,
+        "runner/work-dirs": true,
+        "builder/build-dirs": true,
     },
     "search.exclude": {
         "storage/": true,
-        "runner/plain/*/fuzzing": true,
+        "runner/work-dirs": true,
+        "builder/build-dirs": true,
     },
     "files.watcherExclude": {
         "storage/": true,
-        "runner/plain/*/fuzzing": true,
+        "runner/work-dirs": true,
+        "builder/build-dirs": true,
     },
+    "editor.formatOnSave": true,
 }

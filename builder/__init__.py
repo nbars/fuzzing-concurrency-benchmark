@@ -20,6 +20,14 @@ class BuildArtifact:
     seed_dir: Path
     args: t.List[str]
 
+    def with_new_root(self, new_root: Path) -> "BuildArtifact":
+        return BuildArtifact(
+            self.name,
+            new_root / self.bin_path.name,
+            new_root / self.seed_dir.name,
+            self.args,
+        )
+
     def validate(self) -> bool:
         for path in [self.bin_path, self.seed_dir]:
             assert path.exists(), f"{path} does not exists"
