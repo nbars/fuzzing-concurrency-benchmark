@@ -100,6 +100,14 @@ class DockerRunner(EvaluationRunner):
                 f"Looks like there are Docker containers from another run: {out}"
             )
 
+        out = subprocess.check_output(
+            "pgrep afl-fuzz || true", shell=True, encoding="utf8"
+        ).strip()
+        if out:
+            raise RuntimeError(
+                f"Looks like other afl-fuzz processes are running: {out}"
+            )
+
         # First, start all docker containers we are going to need
         max_container_cnt = math.ceil(self._job_cnt / self._num_processes_per_container)
 
@@ -111,7 +119,7 @@ class DockerRunner(EvaluationRunner):
             try:
                 cpus = [
                     str(free_cpus.pop(0))
-                    for _ in range(self._num_processes_per_container + 1)  # inclusive
+                    for _ in range(self._num_processes_per_container)  # inclusive
                 ]
             except:
                 # We ran out of cpus

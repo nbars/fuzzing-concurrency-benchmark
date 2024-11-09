@@ -221,7 +221,11 @@ def main():
             continue
 
         log.info(f"Final results will be located at {job_storage}")
-        runner.start()
+        try:
+            runner.start()
+        except KeyboardInterrupt:
+            runner.purge()
+            raise
 
         stats_files = runner.stats_files_paths()
         job_storage.mkdir(parents=True)
