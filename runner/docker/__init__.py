@@ -212,6 +212,13 @@ class DockerRunner(EvaluationRunner):
 
     def purge(self):
         super().purge()
+        subprocess.run(
+            f"docker rmi -f {self._image_name}",
+            shell=True,
+            check=False,
+            stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+        )
         if self._spawned_container_ids:
             for c in self._spawned_container_ids:
                 subprocess.run(
