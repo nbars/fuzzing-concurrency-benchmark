@@ -1,1 +1,3 @@
 **/__pycache__
+builder/build-dirs/
+runner/work-dirs/
