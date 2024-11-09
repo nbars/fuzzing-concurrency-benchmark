@@ -49,7 +49,6 @@ class DockerRunner(EvaluationRunner):
         assert num_proccesses_containers == 1
 
     def prepare(self, purge: bool = False) -> bool:
-        purge = True
         cmd = "echo core | sudo tee /proc/sys/kernel/core_pattern"
         log.info(f"Running {cmd}")
         subprocess.check_call(cmd, shell=True)
