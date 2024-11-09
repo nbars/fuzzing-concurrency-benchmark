@@ -228,6 +228,9 @@ def main():
         for i, stats_path in enumerate(stats_files):
             shutil.copy(stats_path, job_storage / f"{i}_stats_file.txt")
 
+        log.info("Removing runner results")
+        runner.purge()
+
 
 if __name__ == "__main__":
     main()

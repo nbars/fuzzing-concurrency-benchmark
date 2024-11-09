@@ -68,6 +68,7 @@ class EvaluationRunner(ABC):
 
     def purge(self) -> None:
         if self.work_dir().exists():
+            log.info(f"Purging {self.work_dir()}")
             shutil.rmtree(self.work_dir())
 
     @abstractmethod
