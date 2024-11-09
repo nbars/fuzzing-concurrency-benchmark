@@ -59,7 +59,9 @@ def build_targets(afl_config: AflConfig) -> list[BuildArtifact]:
             targets_artifacts.append(builder.build_artifact())
         except:
             builder.set_purge_on_next_build_flag()
-            raise RuntimeError(f"Error while building {builder.target_name()}. The work directory if the target will be automatically purged on next build.")
+            raise RuntimeError(
+                f"Error while building {builder.target_name()}. The work directory if the target will be automatically purged on next build."
+            )
     return targets_artifacts
 
 
@@ -99,7 +101,9 @@ def prepare_runners(
                     runner.prepare(purge=True)
                 except:
                     runner.set_purge_on_next_prepare_flag()
-                    raise RuntimeError(f"Failed to prepare runner {runner}. Retry on next prepare.")
+                    raise RuntimeError(
+                        f"Failed to prepare runner {runner}. Retry on next prepare."
+                    )
                 runners.append(runner)
     return runners
 
@@ -179,9 +183,12 @@ def main():
         f"We are going to perform {len(job_cnt_configurations)} different configurations with a timeout of {timeout_s} seconds"
     )
 
-    from runner import PlainAflRunner, DockerRunner
+    from runner import PlainAflRunner, DefaultDockerRunner
 
-    enabled_runner_types: list[type[EvaluationRunner]] = [PlainAflRunner, DockerRunner]
+    enabled_runner_types: list[type[EvaluationRunner]] = [
+        PlainAflRunner,
+        DefaultDockerRunner,
+    ]
 
     afl_config = build_aflpp()
     targets_artifacts = build_targets(afl_config)

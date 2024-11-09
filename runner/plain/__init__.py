@@ -34,9 +34,13 @@ class PlainAflRunner(EvaluationRunner):
     def start(self) -> None:
         log.info(f"Results are going to be stored in {self.work_dir()}")
 
-        out = subprocess.check_output("pgrep afl-fuzz || true", shell=True, encoding="utf8").strip()
+        out = subprocess.check_output(
+            "pgrep afl-fuzz || true", shell=True, encoding="utf8"
+        ).strip()
         if out:
-            raise RuntimeError(f"Looks like other afl-fuzz processes are running: {out}")
+            raise RuntimeError(
+                f"Looks like other afl-fuzz processes are running: {out}"
+            )
 
         env = {
             "AFL_NO_UI": "1",

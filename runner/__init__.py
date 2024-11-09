@@ -1,2 +1,2 @@
 from .plain import PlainAflRunner
-from .docker import DockerRunner
+from .docker import DefaultDockerRunner

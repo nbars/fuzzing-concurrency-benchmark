@@ -206,3 +206,11 @@ class DockerRunner(EvaluationRunner):
         if self._spawned_container_ids:
             for c in self._spawned_container_ids:
                 subprocess.run(f"docker rm -f {c}", shell=True, check=False)
+
+
+class DefaultDockerRunner(DockerRunner):
+    """
+    Runner without any special setting such as disabled overlayfs etc.
+    """
+
+    pass
