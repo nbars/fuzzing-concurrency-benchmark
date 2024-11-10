@@ -64,7 +64,7 @@ class EvaluationRunner(ABC):
         return True
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}:{self._target.name},{self._job_cnt=},{self._timeout_s=}"
+        return f"{self.__class__.__name__}:target_name={self._target.name},job_cnt={self._job_cnt},timeout_s={self._timeout_s}"
 
     def purge(self) -> None:
         if self.work_dir().exists():
