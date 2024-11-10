@@ -15,4 +15,8 @@
         "builder/build-dirs": true,
     },
     "editor.formatOnSave": true,
+    "python.analysis.exclude": [
+        "runner/plain/*/fuzzing",
+        "storage/"
+    ]
 }
