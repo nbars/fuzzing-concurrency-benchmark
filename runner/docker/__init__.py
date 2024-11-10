@@ -118,7 +118,9 @@ class DockerRunner(EvaluationRunner):
             try:
                 cpus = [
                     str(free_cpus.pop(0))
-                    for _ in range(self._num_processes_per_container)  # inclusive
+                    for _ in range(
+                        min(self._num_processes_per_container, self.job_cnt())
+                    )
                 ]
             except:
                 # We ran out of cpus
@@ -140,8 +142,14 @@ class DockerRunner(EvaluationRunner):
 
         def stop_all_container():
             assert self._spawned_container_ids
+            log.info(f"Stopping all {len(self._spawned_container_ids)} containers.")
             for c in self._spawned_container_ids:
-                subprocess.run(f"docker kill {c}", shell=True, check=False)
+                subprocess.run(
+                    f"docker kill {c}",
+                    shell=True,
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                )
 
         env = {
             "AFL_NO_UI": "1",

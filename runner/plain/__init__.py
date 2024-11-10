@@ -16,7 +16,7 @@ from logger import get_logger
 log = get_logger()
 
 
-class PlainAflRunner(EvaluationRunner):
+class DefaultAflRunner(EvaluationRunner):
 
     def __init__(
         self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int

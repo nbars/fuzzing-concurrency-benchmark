@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import time
 import typing as t
 import argparse
 import shutil
 import re
 import random
+import enum
 from abc import ABC, abstractmethod
 from builder import BuildArtifact
 from builder.aflpp import AflConfig, AflppBuilder
@@ -13,7 +15,7 @@ from logger import get_logger, setup_root_logger
 from pathlib import Path
 
 from runner.base import EvaluationRunner
-from runner.plain import PlainAflRunner
+from runner.plain import DefaultAflRunner
 
 setup_root_logger()
 log = get_logger()
@@ -133,8 +135,8 @@ def main():
     main_parser.add_argument(
         "--max-concurrent-jobs",
         type=range_limited_int(),
-        default=4,
-        help="The maximum number of jobs the test series is executed for with.",
+        default=208,
+        help="The maximum number of jobs the test series is executed for.",
     )
     main_parser.add_argument(
         "--storage",
@@ -145,7 +147,7 @@ def main():
     main_parser.add_argument(
         "--step-timeout",
         type=parse_time_as_s,
-        default="1m",
+        default="10m",
         help="The minimum number of jobs the test series is started with.",
     )
     main_parser.add_argument(
@@ -153,6 +155,24 @@ def main():
         type=bool,
         default=False,
         help="Only build the target without performing any experiment.",
+    )
+
+    from runner import DefaultAflRunner, DefaultDockerRunner
+
+    class Runners(enum.Enum):
+        DEFAULT_AFL_RUNNER = DefaultAflRunner
+        DEFAULT_DOCKER_RUNNER = DefaultDockerRunner
+
+        def __str__(self) -> str:
+            return str(self.name)
+
+    main_parser.add_argument(
+        "--runners",
+        type=lambda e: getattr(Runners, e),
+        choices=list(Runners),
+        nargs="+",
+        default=[e.name for e in Runners],
+        help="The runner that should be executed.",
     )
 
     args = main_parser.parse_args()
@@ -183,11 +203,8 @@ def main():
         f"We are going to perform {len(job_cnt_configurations)} different configurations with a timeout of {timeout_s} seconds"
     )
 
-    from runner import PlainAflRunner, DefaultDockerRunner
-
     enabled_runner_types: list[type[EvaluationRunner]] = [
-        PlainAflRunner,
-        DefaultDockerRunner,
+        rty.value for rty in args.runners
     ]
 
     afl_config = build_aflpp()
@@ -197,6 +214,7 @@ def main():
         timeout_s, job_cnt_configurations, enabled_runner_types, targets_artifacts
     )
     log.info(f"This campaign will take {total_runtime} in total")
+    time.sleep(1)
 
     runners = prepare_runners(
         timeout_s,
