@@ -151,6 +151,10 @@ class DockerRunner(EvaluationRunner):
                     stdout=subprocess.DEVNULL,
                 )
 
+        # TODO: Add affinity by manually calling taskset in the containers.
+        # For one job per container, this does not matter, though.
+        assert self._num_processes_per_container == 1
+
         env = {
             "AFL_NO_UI": "1",
             # aflpp's affinity code is racy and we are in contains
