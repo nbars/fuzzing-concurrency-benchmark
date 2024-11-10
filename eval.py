@@ -232,6 +232,7 @@ def main():
 
         runner_name = str(runner)
         job_storage = storage_path / f"{runner_name}"
+        stats_storage = job_storage / "stats_files"
         if job_storage.exists():
             log.info(
                 f"Results for current configuration are already at {job_storage}, skipping..."
@@ -245,10 +246,12 @@ def main():
             runner.purge()
             raise
 
-        stats_files = runner.stats_files_paths()
+        # Sync results stats files into storage folder
         job_storage.mkdir(parents=True)
+        stats_storage.mkdir()
+        stats_files = runner.stats_files_paths()
         for i, stats_path in enumerate(stats_files):
-            shutil.copy(stats_path, job_storage / f"{i}_stats_file.txt")
+            shutil.copy(stats_path, stats_storage / f"{i}_stats_file.txt")
 
         log.info("Removing runner results")
         runner.purge()
