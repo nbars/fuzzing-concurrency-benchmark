@@ -30,7 +30,12 @@ class DockerRunner(EvaluationRunner):
         with_overlayfs: bool = True,
         num_proccesses_containers: int = 1,
     ) -> None:
-        super().__init__(target, afl_config, job_cnt, timeout_s)
+        custom_attrs = {
+            "with_overlayfs": str(with_overlayfs),
+            "num_processes_per_container": str(num_proccesses_containers),
+        }
+        super().__init__(target, afl_config, job_cnt, timeout_s, custom_attrs)
+
         self._image_name = (
             str(self)
             .replace(":", "_")
@@ -41,11 +46,11 @@ class DockerRunner(EvaluationRunner):
         )
         self._with_overlayfs = with_overlayfs
         self._num_processes_per_container = num_proccesses_containers
+
         self._spawned_container_ids: t.Optional[t.List[str]] = None
         self._contrainer_root = Path("/work")
         self._container_afl_config = AflConfig(self._contrainer_root / "aflpp")
         self._container_target = self.target().with_new_root(self._contrainer_root)
-        assert with_overlayfs
         assert num_proccesses_containers == 1
 
     def prepare(self, purge: bool = False) -> bool:
@@ -112,8 +117,7 @@ class DockerRunner(EvaluationRunner):
 
         free_cpus = list(range(multiprocessing.cpu_count()))
         self._spawned_container_ids = []
-        for i in range(max_container_cnt):
-            # TODO: Overlayfs
+        for _ in range(max_container_cnt):
             cpus = []
             try:
                 cpus = [
@@ -122,16 +126,23 @@ class DockerRunner(EvaluationRunner):
                         min(self._num_processes_per_container, self.job_cnt())
                     )
                 ]
-            except:
+            except IndexError:
                 # We ran out of cpus
                 assert not free_cpus
 
-            cpus_flag = ""
+            additional_args = []
             if cpus:
                 cpus_flag = ",".join(cpus)
-                cpus_flag = f"--cpuset-cpus={cpus_flag}"
+                additional_args.append(f"--cpuset-cpus={cpus_flag}")
 
-            cmd = f"docker run -d {cpus_flag} -t {self._image_name} bash"
+            if not self._with_overlayfs:
+                additional_args += [
+                    "-v",
+                    f"{self.work_dir().as_posix()}:{self._contrainer_root.as_posix()}",
+                ]
+
+            additional_args = " ".join(additional_args)
+            cmd = f"docker run -d {additional_args} -t {self._image_name} bash"
             log.info(f"Spawning container: {cmd}")
             output = subprocess.check_output(
                 cmd,
@@ -171,7 +182,7 @@ class DockerRunner(EvaluationRunner):
             ]
             local_instance_dir = self.work_dir() / f"{job_idx}"
             local_instance_dir.mkdir(parents=True, exist_ok=True)
-            local_log_file = local_instance_dir / "log.txt"
+            local_log_file = local_instance_dir / f"{job_idx}_log.txt"
             local_log_file_fd = local_log_file.open("w")
             container_instance_dir = f"{self._contrainer_root.as_posix()}/{job_idx}"
             target_args = " ".join(self._container_target.args)
@@ -219,6 +230,9 @@ class DockerRunner(EvaluationRunner):
                 )
                 subprocess.check_call(f"docker rm -f {c}", shell=True)
 
+        # Permission fixup for files created by the container
+        subprocess.check_call(f"sudo chmod -R 777 {self.work_dir()}", shell=True)
+
     def stats_files_paths(self) -> t.List[Path]:
         return list(self.work_dir().glob("*fuzzer_stats"))
 
@@ -248,3 +262,25 @@ class DefaultDockerRunner(DockerRunner):
     """
 
     pass
+
+
+class DockerRunnerWithoutOverlayfs(DockerRunner):
+    """
+    Same as DefaultDockerRunner but without using overlayfs for the working directory.
+    """
+
+    def __init__(
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+        )
