@@ -250,6 +250,9 @@ def main():
         job_storage.mkdir(parents=True)
         stats_storage.mkdir()
         stats_files = runner.stats_files_paths()
+        assert (
+            len(stats_files) == runner.job_cnt()
+        ), f"{len(stats_files)} != {runner.job_cnt()}"
         for i, stats_path in enumerate(stats_files):
             shutil.copy(stats_path, stats_storage / f"{i}_stats_file.txt")
 
