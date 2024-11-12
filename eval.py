@@ -208,6 +208,13 @@ def main():
             args.concurrent_jobs_step,
         )
     )
+
+    # args.min_concurrent_jobs can be set to zero to enabled generation number that
+    # are always even (in regards to concurrent_jobs_step).
+    if 0 in job_cnt_configurations_set:
+        job_cnt_configurations_set.remove(0)
+        job_cnt_configurations_set.add(1)
+
     job_cnt_configurations_set = additional_jobs_step | job_cnt_configurations_set
     job_cnt_configurations = list(job_cnt_configurations_set)
     if len(job_cnt_configurations) >= 3:
