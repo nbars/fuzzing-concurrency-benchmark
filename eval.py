@@ -110,6 +110,23 @@ def prepare_runners(
     return runners
 
 
+def order_for_fast_exploration(data: t.List[int]) -> t.List[int]:
+    assert len(data) >= 3
+    data = sorted(data.copy())
+    result = [data[0], data[-1], data[len(data) // 2]]
+    queue = [(0, len(data) // 2), (len(data) // 2, len(data) - 1)]
+
+    while queue:
+        start, end = queue.pop(0)
+        if end - start > 1:
+            mid = (start + end) // 2
+            result.append(data[mid])
+            queue.append((start, mid))
+            queue.append((mid, end))
+
+    return result
+
+
 def main():
 
     main_parser = argparse.ArgumentParser(
@@ -193,7 +210,8 @@ def main():
     )
     job_cnt_configurations_set = additional_jobs_step | job_cnt_configurations_set
     job_cnt_configurations = list(job_cnt_configurations_set)
-    random.shuffle(job_cnt_configurations)
+    if len(job_cnt_configurations) >= 3:
+        job_cnt_configurations = order_for_fast_exploration(job_cnt_configurations)
 
     if job_cnt_configurations[-1] != args.max_concurrent_jobs:
         log.warning(
