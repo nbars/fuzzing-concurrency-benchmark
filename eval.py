@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import subprocess
 import time
 import typing as t
 import argparse
@@ -137,22 +138,25 @@ def main():
     main_parser.add_argument(
         "--min-concurrent-jobs",
         type=range_limited_int(),
-        default=1,
+        default=0,
         help="The minimum number of jobs the test series is started with.",
     )
     main_parser.add_argument(
         "--concurrent-jobs-step",
         type=range_limited_int(),
-        default=1,
+        default=8,
         help="Steps in that the value is increment start at min-concurrent-jobs to max-concurrent-jobs.",
     )
     main_parser.add_argument(
-        "--additional-jobs-step", type=set, default=set([]), help=""
+        "--additional-jobs-step",
+        type=set,
+        default=set([52, 52 * 2]),
+        help="",  # 52, 104
     )
     main_parser.add_argument(
         "--max-concurrent-jobs",
         type=range_limited_int(),
-        default=208,
+        default=120,
         help="The maximum number of jobs the test series is executed for.",
     )
     main_parser.add_argument(
@@ -164,7 +168,7 @@ def main():
     main_parser.add_argument(
         "--step-timeout",
         type=parse_time_as_s,
-        default="10m",
+        default="30m",
         help="The minimum number of jobs the test series is started with.",
     )
     main_parser.add_argument(
@@ -174,21 +178,20 @@ def main():
         help="Only build the target without performing any experiment.",
     )
 
-    from runner import DefaultAflRunner, DefaultDockerRunner
+    from runner import docker
 
     class Runners(enum.Enum):
         DEFAULT_AFL_RUNNER = DefaultAflRunner
-        DEFAULT_DOCKER_RUNNER = DefaultDockerRunner
 
         def __str__(self) -> str:
             return str(self.name)
 
     main_parser.add_argument(
         "--runners",
-        type=lambda e: getattr(Runners, e),
+        type=lambda e: Runners(e).value,
         choices=list(Runners),
         nargs="+",
-        default=[e.name for e in Runners],
+        default=[r.value for r in Runners],
         help="The runner that should be executed.",
     )
 
@@ -228,8 +231,27 @@ def main():
         f"We are going to perform {len(job_cnt_configurations)} different configurations with a timeout of {timeout_s} seconds"
     )
 
+    subprocess.check_call(
+        "echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
+        shell=True,
+    )
+    subprocess.check_call(
+        "echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo",
+        shell=True,
+    )
+
+    # enabled_runner_types: list[type[EvaluationRunner]] = [rty for rty in args.runners]
     enabled_runner_types: list[type[EvaluationRunner]] = [
-        rty.value for rty in args.runners
+        docker.DockerRunnerBase,
+        docker.DockerRunnerNoOverlay,
+        docker.DockerRunnerNoOverlayPriv,
+        docker.DockerRunnerNoOverlayNoPidNs,
+        docker.DockerRunnerNoOverlayNoCgroups,
+        docker.DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCaps,
+        docker.DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNs,
+        docker.DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup,
+        docker.DockerRunnerSingleContainer,
+        docker.DockerRunnerSingleContainerNoOverlay,
     ]
 
     afl_config = build_aflpp()

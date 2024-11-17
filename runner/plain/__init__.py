@@ -19,8 +19,14 @@ log = get_logger()
 class DefaultAflRunner(EvaluationRunner):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        without_pinning: bool = False,
     ) -> None:
+        self._without_pinning = without_pinning
         super().__init__(target, afl_config, job_cnt, timeout_s)
 
     def prepare(self, purge: bool = False) -> bool:
@@ -60,7 +66,8 @@ class DefaultAflRunner(EvaluationRunner):
             # If we ran out of CPUs, we do not constrain the task
             if free_cpus:
                 cpu_idx = free_cpus.pop(0)
-                cmd = f"taskset -c {cpu_idx} "
+                if not self._without_pinning:
+                    cmd = f"taskset -c {cpu_idx} "
             cmd += f"{self.afl_config().afl_fuzz()} -i {self.target().seed_dir} -o {instance_dir} -- {self.target().bin_path} {args}"
             log.info(f"{cmd=}")
 
@@ -102,7 +109,28 @@ class DefaultAflRunner(EvaluationRunner):
                     log.info(f"Target {j.pid} terminate")
                 # afl++ sometimes fails to kill their childs :)
                 subprocess.run("pkill -9 afl-fuzz", shell=True, check=False)
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    log.info("Waiting for afl processes to terminate")
+                    time.sleep(5)
+                    out = subprocess.check_output(
+                        "pgrep afl-fuzz || true", shell=True, encoding="utf8"
+                    ).strip()
+                    if not out:
+                        break
+                else:
+                    raise RuntimeError(
+                        "Failed to terminate remaining afl-fuzz processes"
+                    )
                 break
 
     def stats_files_paths(self) -> t.List[Path]:
         return list(self.work_dir().glob("*/*/fuzzer_stats"))
+
+
+class AflRunnerWithoutPin(DefaultAflRunner):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(target, afl_config, job_cnt, timeout_s, without_pinning=True)

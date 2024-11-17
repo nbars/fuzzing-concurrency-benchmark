@@ -1,3 +1,2 @@
-from .plain import DefaultAflRunner
-from .docker import DefaultDockerRunner, DockerRunnerWithoutOverlayfs
+from .plain import DefaultAflRunner, AflRunnerWithoutPin
 from .vm import DefaultVmRunner, DefaultVmRunnerV2

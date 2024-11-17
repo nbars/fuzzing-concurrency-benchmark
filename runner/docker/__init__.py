@@ -19,7 +19,7 @@ from logger import get_logger
 log = get_logger()
 
 
-class DockerRunner(EvaluationRunner):
+class DockerRunnerBase(EvaluationRunner):
 
     def __init__(
         self,
@@ -29,6 +29,7 @@ class DockerRunner(EvaluationRunner):
         timeout_s: int,
         with_overlayfs: bool = True,
         num_proccesses_containers: int = 1,
+        custom_container_flags: t.Optional[t.List[str]] = None,
     ) -> None:
         custom_attrs = {
             "with_overlayfs": str(with_overlayfs),
@@ -36,6 +37,7 @@ class DockerRunner(EvaluationRunner):
         }
         super().__init__(target, afl_config, job_cnt, timeout_s, custom_attrs)
 
+        # Make Docker's args parser happy
         self._image_name = (
             str(self)
             .replace(":", "_")
@@ -46,12 +48,14 @@ class DockerRunner(EvaluationRunner):
         )
         self._with_overlayfs = with_overlayfs
         self._num_processes_per_container = num_proccesses_containers
+        self._custom_container_flags = custom_container_flags
 
         self._spawned_container_ids: t.Optional[t.List[str]] = None
         self._contrainer_root = Path("/work")
         self._container_afl_config = AflConfig(self._contrainer_root / "aflpp")
         self._container_target = self.target().with_new_root(self._contrainer_root)
-        assert num_proccesses_containers == 1
+        # Make sure we always can assign threads + hyper threads
+        assert num_proccesses_containers == 1 or (num_proccesses_containers % 2) == 0
 
     def prepare(self, purge: bool = False) -> bool:
         cmd = "echo core | sudo tee /proc/sys/kernel/core_pattern"
@@ -75,7 +79,7 @@ class DockerRunner(EvaluationRunner):
         ENV DEBIAN_FRONTEND "noninteractive"
 
         RUN apt update -y
-        RUN apt install -y clang llvm lld
+        RUN apt install -y clang llvm lld python3 libpython3.10
 
         RUN mkdir {self._contrainer_root}
         COPY ./ {self._contrainer_root}
@@ -115,13 +119,28 @@ class DockerRunner(EvaluationRunner):
         # First, start all docker containers we are going to need
         max_container_cnt = math.ceil(self._job_cnt / self._num_processes_per_container)
 
-        free_cpus = list(range(multiprocessing.cpu_count()))
+        if self._num_processes_per_container > 1:
+            # Create a list that contains (interleaved) a cpu id of a thread and its corresponding hyper thread
+            all_free_cpus = list(range(multiprocessing.cpu_count()))
+            assert (len(all_free_cpus) % 2) == 0
+            threads = all_free_cpus[: len(all_free_cpus) // 2]
+            hyper_threads = all_free_cpus[len(all_free_cpus) // 2 :]
+            assert len(threads) == len(hyper_threads)
+
+            free_cpus = itertools.zip_longest(threads, hyper_threads)
+            free_cpus = list(itertools.chain(*free_cpus))
+        else:
+            # If we do not have multiple tasks per container, we just schedule
+            # on threads first and on hyper threads last.
+            free_cpus = list(range(multiprocessing.cpu_count()))
+
         self._spawned_container_ids = []
+        container_id_to_cpus: t.Dict[str, t.List[int]] = dict()
         for _ in range(max_container_cnt):
             cpus = []
             try:
                 cpus = [
-                    str(free_cpus.pop(0))
+                    int(free_cpus.pop(0))
                     for _ in range(
                         min(self._num_processes_per_container, self.job_cnt())
                     )
@@ -130,9 +149,13 @@ class DockerRunner(EvaluationRunner):
                 # We ran out of cpus
                 assert not free_cpus
 
+            # Additional args that are passed to docker run <args>
             additional_args = []
+            if self._custom_container_flags:
+                additional_args += self._custom_container_flags
+
             if cpus:
-                cpus_flag = ",".join(cpus)
+                cpus_flag = ",".join([str(i) for i in cpus])
                 additional_args.append(f"--cpuset-cpus={cpus_flag}")
 
             if not self._with_overlayfs:
@@ -150,6 +173,7 @@ class DockerRunner(EvaluationRunner):
                 encoding="utf8",
             ).strip()
             self._spawned_container_ids.append(output)
+            container_id_to_cpus[output] = cpus
 
         def stop_all_container():
             assert self._spawned_container_ids
@@ -162,13 +186,9 @@ class DockerRunner(EvaluationRunner):
                     stdout=subprocess.DEVNULL,
                 )
 
-        # TODO: Add affinity by manually calling taskset in the containers.
-        # For one job per container, this does not matter, though.
-        assert self._num_processes_per_container == 1
-
         env = {
             "AFL_NO_UI": "1",
-            # aflpp's affinity code is racy and we are in contains
+            # aflpp's affinity code is racy and we are in containers.
             "AFL_NO_AFFINITY": "1",
         }
         env_args = [["-e", f"{arg}={value}"] for arg, value in env.items()]
@@ -176,23 +196,31 @@ class DockerRunner(EvaluationRunner):
 
         container_id_to_job_ids = defaultdict(list)
         jobs: t.List[subprocess.Popen] = []  # type: ignore
+
+        # Start all jobs
         for job_idx in range(self._job_cnt):
-            container = self._spawned_container_ids[
+            container_id = self._spawned_container_ids[
                 job_idx % len(self._spawned_container_ids)
             ]
+            pinnable_cpu = container_id_to_cpus[container_id]
+            taskset_cmd = ""
+            if pinnable_cpu:
+                cpu_id = pinnable_cpu.pop(0)
+                taskset_cmd = f"taskset -c {cpu_id}"
+
             local_instance_dir = self.work_dir() / f"{job_idx}"
             local_instance_dir.mkdir(parents=True, exist_ok=True)
             local_log_file = local_instance_dir / f"{job_idx}_log.txt"
             local_log_file_fd = local_log_file.open("w")
             container_instance_dir = f"{self._contrainer_root.as_posix()}/{job_idx}"
             target_args = " ".join(self._container_target.args)
-            afl_cmd = f"{self._container_afl_config.afl_fuzz()} -i {self._container_target.seed_dir} -o {container_instance_dir} -- {self._container_target.bin_path} {target_args}"
-            cmd = f"docker exec {env_args} -t {container} {afl_cmd}"
+            afl_cmd = f"{taskset_cmd} {self._container_afl_config.afl_fuzz()} -i {self._container_target.seed_dir} -o {container_instance_dir} -- {self._container_target.bin_path} {target_args}"
+            cmd = f"docker exec {env_args} -t {container_id} {afl_cmd}"
             log.info(f"Spawning process in container: {cmd}")
             j = subprocess.Popen(
                 cmd, shell=True, stdout=local_log_file_fd, stderr=subprocess.STDOUT
             )
-            container_id_to_job_ids[container].append(job_idx)
+            container_id_to_job_ids[container_id].append(job_idx)
             jobs.append(j)
 
         deadline = time.monotonic() + self._timeout_s
@@ -228,7 +256,7 @@ class DockerRunner(EvaluationRunner):
                     f"docker cp {c}:{self._contrainer_root}/{job_id}/default/fuzzer_stats {self._work_dir}/{job_id}_fuzzer_stats",
                     shell=True,
                 )
-                subprocess.check_call(f"docker rm -f {c}", shell=True)
+            subprocess.check_call(f"docker rm -f {c}", shell=True)
 
         # Permission fixup for files created by the container
         subprocess.check_call(f"sudo chmod -R 777 {self.work_dir()}", shell=True)
@@ -256,17 +284,31 @@ class DockerRunner(EvaluationRunner):
                 )
 
 
-class DefaultDockerRunner(DockerRunner):
+class DockerRunner(DockerRunnerBase):
     """
     Runner without any special setting such as disabled overlayfs etc.
     """
 
-    pass
+    def __init__(
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=True,
+            num_proccesses_containers=1,
+        )
 
 
-class DockerRunnerWithoutOverlayfs(DockerRunner):
+class DockerRunnerNoOverlay(DockerRunnerBase):
     """
-    Same as DefaultDockerRunner but without using overlayfs for the working directory.
+    Same as DockerRunner but without using overlayfs for the working directory.
     """
 
     def __init__(
@@ -283,4 +325,190 @@ class DockerRunnerWithoutOverlayfs(DockerRunner):
             timeout_s,
             with_overlayfs=False,
             num_proccesses_containers=1,
+        )
+
+
+class DockerRunnerSingleContainer(DockerRunnerBase):
+    """
+    Same as DockerRunner but all jobs in one container.
+    """
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=True,
+            num_proccesses_containers=120,
+        )
+
+
+class DockerRunnerSingleContainerNoOverlay(DockerRunnerBase):
+    """
+    Same as DockerRunner but all jobs in one container.
+    """
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=120,
+        )
+
+
+class DockerRunnerNoOverlayNoPidNs(DockerRunnerBase):
+    """
+    Same as DockerRunner but without using overlayfs for the working directory.
+    """
+
+    def __init__(
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+    ) -> None:
+        flags = [
+            "--pid host",
+        ]
+
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerNoOverlayNoCgroups(DockerRunnerBase):
+    """
+    Same as DockerRunner but without using overlayfs for the working directory.
+    """
+
+    def __init__(
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+    ) -> None:
+        flags = [
+            "--cgroupns=host",
+        ]
+
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerNoOverlayPriv(DockerRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCaps(DockerRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+            "--security-opt seccomp=unconfined",
+            "--security-opt apparmor=unconfined",
+            "--cap-add=ALL",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNs(DockerRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+            "--security-opt seccomp=unconfined",
+            "--security-opt apparmor=unconfined",
+            "--cap-add=ALL",
+            "--network host",
+            "--pid host",
+            "--ipc host",
+            "--uts host",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup(
+    DockerRunnerBase
+):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+            "--cap-add=ALL",
+            "--security-opt seccomp=unconfined",
+            "--security-opt apparmor=unconfined",
+            "--network host",
+            "--pid host",
+            "--ipc host",
+            "--uts host",
+            "--cgroupns=host",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
         )
