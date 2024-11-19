@@ -16,7 +16,7 @@ from logger import get_logger
 log = get_logger()
 
 
-class DefaultAflRunner(EvaluationRunner):
+class AflRunnerBase(EvaluationRunner):
 
     def __init__(
         self,
@@ -128,7 +128,15 @@ class DefaultAflRunner(EvaluationRunner):
         return list(self.work_dir().glob("*/*/fuzzer_stats"))
 
 
-class AflRunnerWithoutPin(DefaultAflRunner):
+class AflRunner(AflRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(target, afl_config, job_cnt, timeout_s, without_pinning=False)
+
+
+class AflRunnerWithoutPin(AflRunnerBase):
 
     def __init__(
         self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int

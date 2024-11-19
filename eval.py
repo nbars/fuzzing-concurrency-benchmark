@@ -16,7 +16,7 @@ from logger import get_logger, setup_root_logger
 from pathlib import Path
 
 from runner.base import EvaluationRunner
-from runner.plain import DefaultAflRunner
+from runner.plain import AflRunnerBase
 
 setup_root_logger()
 log = get_logger()
@@ -178,10 +178,10 @@ def main():
         help="Only build the target without performing any experiment.",
     )
 
-    from runner import docker
+    from runner import docker, plain, vm
 
     class Runners(enum.Enum):
-        DEFAULT_AFL_RUNNER = DefaultAflRunner
+        DEFAULT_AFL_RUNNER = AflRunnerBase
 
         def __str__(self) -> str:
             return str(self.name)
