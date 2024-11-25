@@ -25,8 +25,10 @@ class AflRunnerBase(EvaluationRunner):
         job_cnt: int,
         timeout_s: int,
         without_pinning: bool = False,
+        with_turbo: bool = False,
     ) -> None:
         self._without_pinning = without_pinning
+        self._with_turbo = with_turbo
         super().__init__(target, afl_config, job_cnt, timeout_s)
 
     def prepare(self, purge: bool = False) -> bool:
@@ -46,6 +48,12 @@ class AflRunnerBase(EvaluationRunner):
         if out:
             raise RuntimeError(
                 f"Looks like other afl-fuzz processes are running: {out}"
+            )
+
+        if self._with_turbo:
+            subprocess.check_call(
+                "echo 0 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo",
+                shell=True,
             )
 
         env = {
