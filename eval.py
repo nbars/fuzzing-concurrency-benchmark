@@ -128,6 +128,21 @@ def order_for_fast_exploration(data: t.List[int]) -> t.List[int]:
     return result
 
 
+def disable_turbo_and_set_performance():
+    subprocess.check_call(
+        "echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
+        shell=True,
+    )
+    subprocess.check_call(
+        "echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo",
+        shell=True,
+    )
+    subprocess.check_call(
+        "echo 1 | sudo tee /proc/sys/kernel/shm_rmid_forced",
+        shell=True,
+    )
+
+
 def main():
 
     main_parser = argparse.ArgumentParser(
@@ -231,15 +246,6 @@ def main():
         f"We are going to perform {len(job_cnt_configurations)} different configurations with a timeout of {timeout_s} seconds"
     )
 
-    subprocess.check_call(
-        "echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
-        shell=True,
-    )
-    subprocess.check_call(
-        "echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo",
-        shell=True,
-    )
-
     # enabled_runner_types: list[type[EvaluationRunner]] = [rty for rty in args.runners]
     enabled_runner_types: list[type[EvaluationRunner]] = [
         docker.DockerRunnerBase,
@@ -285,6 +291,8 @@ def main():
                 f"Results for current configuration are already at {job_storage}, skipping..."
             )
             continue
+
+        disable_turbo_and_set_performance()
 
         log.info(f"Final results will be located at {job_storage}")
         try:
