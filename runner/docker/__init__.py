@@ -134,6 +134,7 @@ class DockerRunnerBase(EvaluationRunner):
         # First, start all docker containers we are going to need
         max_container_cnt = math.ceil(self._job_cnt / self._num_processes_per_container)
 
+        # Prepare `free_cpus`` list for cpu pinning.
         if self._num_processes_per_container > 1:
             # Create a list that contains (interleaved) a cpu id of a thread and its corresponding hyper thread
             all_free_cpus = list(range(multiprocessing.cpu_count()))
@@ -141,36 +142,39 @@ class DockerRunnerBase(EvaluationRunner):
             threads = all_free_cpus[: len(all_free_cpus) // 2]
             hyper_threads = all_free_cpus[len(all_free_cpus) // 2 :]
             assert len(threads) == len(hyper_threads)
+            assert len(set(threads) & set(hyper_threads)) == 0
 
-            free_cpus = itertools.zip_longest(threads, hyper_threads)
-            free_cpus = list(itertools.chain(*free_cpus))
+            # interleaf
+            free_cpu_ids = itertools.zip_longest(threads, hyper_threads)
+            # unpack
+            free_cpu_ids = list(itertools.chain(*free_cpu_ids))
         else:
             # If we do not have multiple tasks per container, we just schedule
             # on threads first and on hyper threads last.
-            free_cpus = list(range(multiprocessing.cpu_count()))
+            free_cpu_ids = list(range(multiprocessing.cpu_count()))
 
         self._spawned_container_ids = []
-        container_id_to_cpus: t.Dict[str, t.List[int]] = dict()
+        container_id_to_cpu_ids: t.Dict[str, t.List[int]] = dict()
         for _ in range(max_container_cnt):
-            cpus = []
+            allocated_cpu_ids = []
             try:
-                cpus = [
-                    int(free_cpus.pop(0))
+                allocated_cpu_ids = [
+                    int(free_cpu_ids.pop(0))
                     for _ in range(
                         min(self._num_processes_per_container, self.job_cnt())
                     )
                 ]
             except IndexError:
                 # We ran out of cpus
-                assert not free_cpus
+                assert not free_cpu_ids
 
             # Additional args that are passed to docker run <args>
             additional_args = []
             if self._custom_container_flags:
                 additional_args += self._custom_container_flags
 
-            if cpus:
-                cpus_flag = ",".join([str(i) for i in cpus])
+            if allocated_cpu_ids:
+                cpus_flag = ",".join([str(i) for i in allocated_cpu_ids])
                 additional_args.append(f"--cpuset-cpus={cpus_flag}")
 
             if not self._with_overlayfs:
@@ -188,8 +192,9 @@ class DockerRunnerBase(EvaluationRunner):
                 encoding="utf8",
             ).strip()
             self._spawned_container_ids.append(output)
-            container_id_to_cpus[output] = cpus
+            container_id_to_cpu_ids[output] = allocated_cpu_ids
 
+        # Inline helper fn to stop all containers.
         def stop_all_container():
             assert self._spawned_container_ids
             log.info(f"Stopping all {len(self._spawned_container_ids)} containers.")
@@ -217,10 +222,10 @@ class DockerRunnerBase(EvaluationRunner):
             container_id = self._spawned_container_ids[
                 job_idx % len(self._spawned_container_ids)
             ]
-            pinnable_cpu = container_id_to_cpus[container_id]
+            pinnable_cpu_ids = container_id_to_cpu_ids[container_id]
             taskset_cmd = ""
-            if pinnable_cpu:
-                cpu_id = pinnable_cpu.pop(0)
+            if pinnable_cpu_ids:
+                cpu_id = pinnable_cpu_ids.pop(0)
                 taskset_cmd = f"taskset -c {cpu_id}"
 
             local_instance_dir = self.work_dir() / f"{job_idx}"
