@@ -1,4 +1,5 @@
 from collections import defaultdict
+import glob
 import os
 import shutil
 import itertools
@@ -17,6 +18,8 @@ from runner.base import EvaluationRunner
 from logger import get_logger
 
 log = get_logger()
+
+is_first_build = True
 
 
 class DockerRunnerBase(EvaluationRunner):
@@ -88,8 +91,20 @@ class DockerRunnerBase(EvaluationRunner):
         docker_file = textwrap.dedent(docker_file)
         (work_dir / "Dockerfile").write_text(docker_file)
 
+        # Additional args that passed to docker build
+        additional_args = []
+        global is_first_build
+        if is_first_build:
+            # Make sure the apt mirrors are up to date, but do that only for
+            # the first instance created of this class.
+            additional_args.append("--no-cache")
+            is_first_build = False
+
+        additional_args = " ".join(additional_args)
         subprocess.check_call(
-            f"docker build -t {self._image_name} .", shell=True, cwd=self.work_dir()
+            f"docker build {additional_args} -t {self._image_name} .",
+            shell=True,
+            cwd=self.work_dir(),
         )
 
         return True
