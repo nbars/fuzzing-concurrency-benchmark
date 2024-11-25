@@ -150,3 +150,33 @@ class AflRunnerWithoutPin(AflRunnerBase):
         self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
     ) -> None:
         super().__init__(target, afl_config, job_cnt, timeout_s, without_pinning=True)
+
+
+class AflRunnerTurbo(AflRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            without_pinning=False,
+            with_turbo=True,
+        )
+
+
+class AflRunnerWithoutPinTurbo(AflRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            without_pinning=True,
+            with_turbo=True,
+        )
