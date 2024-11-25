@@ -384,6 +384,42 @@ class DockerRunnerSingleContainerNoOverlay(DockerRunnerBase):
         )
 
 
+class DockerRunnerSingleContainerPriv(DockerRunnerBase):
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=120,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerSingleContainerNoOverlayPriv(DockerRunnerBase):
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=120,
+            custom_container_flags=flags,
+        )
+
+
 class DockerRunnerNoOverlayNoPidNs(DockerRunnerBase):
     """
     Same as DockerRunner but without using overlayfs for the working directory.
@@ -453,6 +489,63 @@ class DockerRunnerNoOverlayPriv(DockerRunnerBase):
             timeout_s,
             with_overlayfs=False,
             num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerPriv(DockerRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=True,
+            num_proccesses_containers=1,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerPriv2Job(DockerRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=True,
+            num_proccesses_containers=2,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerPriv4Job(DockerRunnerBase):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=True,
+            num_proccesses_containers=4,
             custom_container_flags=flags,
         )
 
