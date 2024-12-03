@@ -362,7 +362,7 @@ class DockerRunnerSingleContainer(DockerRunnerBase):
             job_cnt,
             timeout_s,
             with_overlayfs=True,
-            num_proccesses_containers=120,
+            num_proccesses_containers=1000,
         )
 
 
@@ -380,7 +380,7 @@ class DockerRunnerSingleContainerNoOverlay(DockerRunnerBase):
             job_cnt,
             timeout_s,
             with_overlayfs=False,
-            num_proccesses_containers=120,
+            num_proccesses_containers=1000,
         )
 
 
@@ -397,7 +397,7 @@ class DockerRunnerSingleContainerPriv(DockerRunnerBase):
             job_cnt,
             timeout_s,
             with_overlayfs=False,
-            num_proccesses_containers=120,
+            num_proccesses_containers=1000,
             custom_container_flags=flags,
         )
 
@@ -415,7 +415,36 @@ class DockerRunnerSingleContainerNoOverlayPriv(DockerRunnerBase):
             job_cnt,
             timeout_s,
             with_overlayfs=False,
-            num_proccesses_containers=120,
+            num_proccesses_containers=1000,
+            custom_container_flags=flags,
+        )
+
+
+class DockerRunnerSingleContainerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup(
+    DockerRunnerBase
+):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        flags = [
+            "--privileged",
+            "--cap-add=ALL",
+            "--security-opt seccomp=unconfined",
+            "--security-opt apparmor=unconfined",
+            "--network host",
+            "--pid host",
+            "--ipc host",
+            "--uts host",
+            "--cgroupns=host",
+        ]
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            with_overlayfs=False,
+            num_proccesses_containers=1000,
             custom_container_flags=flags,
         )
 
