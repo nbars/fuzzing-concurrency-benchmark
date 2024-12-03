@@ -1,3 +1,4 @@
+import itertools
 import multiprocessing
 import os
 import signal
@@ -48,19 +49,37 @@ class VmRunner(EvaluationRunner):
     ALREADY_BUILD_CONFIGURATIONS = set()
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        jobs_per_vm: int = 1,
+        memory_per_vm_mib: int = 1024,
     ) -> None:
         super().__init__(target, afl_config, job_cnt, timeout_s)
         self._vm_workdir = Path("/work")
         self._vm_build_artifact = self._target.with_new_root(self._vm_workdir)
         self._vm_afl_config = AflConfig(self._vm_workdir / "aflpp")
         self._ssh_config = self.work_dir() / "vm_ssh_config"
-        self._jobs_per_vm = [1] * self.job_cnt()
+        # Make sure we can always map thread + ht
+        assert jobs_per_vm == 1 or (jobs_per_vm % 2) == 0
+        self._jobs_per_vm = jobs_per_vm
+        self._memory_min = memory_per_vm_mib
+        # self._jobs_per_vm_map[i] is the number of jobs VM i gets assigned
+        self._jobs_per_vm_map = []
+        jobs_left = job_cnt
+        while True:
+            jobs_assigned = min(jobs_per_vm, jobs_left)
+            self._jobs_per_vm_map.append(jobs_assigned)
+            jobs_left -= jobs_assigned
+            if not jobs_left:
+                break
 
     def _vagrant_config(
         self,
         jobs_per_vm: t.List[int],
-        memory: str = "1024m",
+        memory_mib: int = 1024,
     ):
         # cpu_set_conf = ""
         # if cpu_set:
@@ -72,9 +91,24 @@ class VmRunner(EvaluationRunner):
         num_jobs = sum(jobs_per_vm)
         assert num_jobs == self.job_cnt()
 
-        free_cpus = list(range(multiprocessing.cpu_count()))
+        # If we schedule more than one job per VM
+        if any(e for e in self._jobs_per_vm_map if e > 1):
+            # Create a list that contains (interleaved) a cpu id of a thread and a hyper thread
+            all_free_cpus = list(range(multiprocessing.cpu_count()))
+            assert (len(all_free_cpus) % 2) == 0
+            threads = all_free_cpus[: len(all_free_cpus) // 2]
+            hyper_threads = all_free_cpus[len(all_free_cpus) // 2 :]
+            assert len(threads) == len(hyper_threads)
+
+            free_cpus = itertools.zip_longest(threads, hyper_threads)
+            free_cpus = list(itertools.chain(*free_cpus))
+        else:
+            # If we do not have multiple tasks per container, we just schedule
+            # on threads first and on hyper threads last.
+            free_cpus = list(range(multiprocessing.cpu_count()))
 
         per_job_config = []
+        # current_vm_job_cnt is the number of jobs the vm should get assigned
         for vm_id, current_vm_job_cnt in enumerate(jobs_per_vm):
             allocated_cpus = []
             try:
@@ -88,9 +122,16 @@ class VmRunner(EvaluationRunner):
                 allocated_cpus = None
 
             cpu_set_str = ""
+            cpuaffinity_str = ""
             if allocated_cpus:
                 cpu_set_str = ",".join([str(e) for e in allocated_cpus])
-                cpu_set_str = f"libvirt.cpuset = {cpu_set_str}"
+                cpu_set_str = f'libvirt.cpuset = "{cpu_set_str}"'
+
+                # libvirt.cpuaffinitiy 0 => '0-4,^3', 1 => '5', 2 => '6,7'
+                cpuaffinity_str = "libvirt.cpuaffinitiy "
+                for vm_cpu_id, host_cpu_id in enumerate(allocated_cpus):
+                    cpuaffinity_str += f"{vm_cpu_id} => '{host_cpu_id}', "
+                cpuaffinity_str = cpuaffinity_str.rstrip(", ")
 
             afl_cmds = ""
             for _ in range(current_vm_job_cnt):
@@ -153,8 +194,17 @@ class VmRunner(EvaluationRunner):
             config.vm.define :vm_{vm_id} do |runner|
                 runner.vm.provider :libvirt do |libvirt|
                     libvirt.cpus = {current_vm_job_cnt}
-                    {cpu_set_str}
-                    libvirt.memory = "{memory}"
+                    # {cpu_set_str}
+                    {cpuaffinity_str}
+                    # libvirt.cpu_mode = "custom"
+                    # libvirt.nested = true
+                    # libvirt.cpu_mode = "custom"
+                    # libvirt.cpu_model = 'custom'
+                    # libvirt.cpu_feature :name => 'invtsc', :policy => 'require'
+                    libvirt.cpu_mode = "host-model"
+                    libvirt.clock_timer :name => 'rtc', :present => 'no', :tickpolicy => 'catchup'
+                    libvirt.cputopology :sockets => '1', :cores => '{current_vm_job_cnt}', :threads => '1'
+                    libvirt.memory = "{memory_mib}m"
                     libvirt.graphics_type = "none"
                     libvirt.video_type = "none"
                 end
@@ -251,7 +301,7 @@ class VmRunner(EvaluationRunner):
         shutil.copytree(self.target().seed_dir, work_dir / self.target().seed_dir.name)
 
         # Create the Vagrant config
-        config = self._vagrant_config(self._jobs_per_vm)
+        config = self._vagrant_config(self._jobs_per_vm_map, self._memory_min)
         vagrant_config_path = work_dir / "Vagrantfile"
         vagrant_config_path.write_text(config)
 
@@ -352,7 +402,7 @@ class VmRunner(EvaluationRunner):
         )
 
         ssh_session: t.List[subprocess.Popen] = []  # type: ignore
-        for vm_id, _ in enumerate(self._jobs_per_vm):
+        for vm_id, _ in enumerate(self._jobs_per_vm_map):
             log.info(f"Starting fuzzer on {vm_id}")
             run_script_name = f"{vm_id}_run_script.sh"
             run_script_vm_path = self._vm_workdir / run_script_name
@@ -420,3 +470,79 @@ class DefaultVmRunner(VmRunner):
 
 class DefaultVmRunnerV2(VmRunner):
     pass
+
+
+# Leaf some room for other stuff (in total we have 251Gi)
+TOTAL_MEM_MIB = 230 * 1024
+
+
+class VmRunner8cores(VmRunner):
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            jobs_per_vm=8,
+            memory_per_vm_mib=(8 * 1024),
+        )
+
+
+class VmRunner8coresV2(VmRunner):
+    """
+    Compared to `VmRunner8cores` this one uses:
+    libvirt.cpu_mode = "host-model"
+    libvirt.clock_timer :name => 'rtc', :present => 'no', :tickpolicy => 'catchup'
+    libvirt.cputopology :sockets => '1', :cores => '{current_vm_job_cnt}', :threads => '1'
+    """
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            jobs_per_vm=8,
+            memory_per_vm_mib=(8 * 1024),
+        )
+
+
+class VmRunner2cores(VmRunner):
+    """
+    Same as `VmRunner8coresV2` but with 2 cores per VM.
+    """
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            jobs_per_vm=2,
+            memory_per_vm_mib=(2 * 1024),
+        )
+
+
+class DefaultVmRunnerV3(VmRunner):
+    """
+    Same as `VmRunner8coresV2` but with one core per machine.
+    """
+
+    def __init__(
+        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            jobs_per_vm=1,
+            memory_per_vm_mib=1024,
+        )
