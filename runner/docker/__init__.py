@@ -654,3 +654,15 @@ class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup(
             num_proccesses_containers=1,
             custom_container_flags=flags,
         )
+
+
+def all() -> t.List[t.Type[DockerRunnerBase]]:
+    ret = []
+    for _k, v in globals().items():
+        if (
+            isinstance(v, type)
+            and issubclass(v, DockerRunnerBase)
+            and v != DockerRunnerBase
+        ):
+            ret.append(v)
+    return ret

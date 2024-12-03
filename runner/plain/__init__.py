@@ -180,3 +180,11 @@ class AflRunnerWithoutPinTurbo(AflRunnerBase):
             without_pinning=True,
             with_turbo=True,
         )
+
+
+def all() -> t.List[t.Type[AflRunnerBase]]:
+    ret = []
+    for _k, v in globals().items():
+        if isinstance(v, type) and issubclass(v, AflRunnerBase) and v != AflRunnerBase:
+            ret.append(v)
+    return ret
