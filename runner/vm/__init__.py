@@ -54,10 +54,11 @@ class VmRunner(EvaluationRunner):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
         jobs_per_vm: int = 1,
         memory_per_vm_mib: int = 1024,
     ) -> None:
-        super().__init__(target, afl_config, job_cnt, timeout_s)
+        super().__init__(target, afl_config, job_cnt, timeout_s, custom_attrs)
         self._vm_workdir = Path("/work")
         self._vm_build_artifact = self._target.with_new_root(self._vm_workdir)
         self._vm_afl_config = AflConfig(self._vm_workdir / "aflpp")
@@ -479,13 +480,19 @@ TOTAL_MEM_MIB = 230 * 1024
 class VmRunner8cores(VmRunner):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             jobs_per_vm=8,
             memory_per_vm_mib=(8 * 1024),
         )
@@ -500,13 +507,19 @@ class VmRunner8coresV2(VmRunner):
     """
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             jobs_per_vm=8,
             memory_per_vm_mib=(8 * 1024),
         )
@@ -518,13 +531,19 @@ class VmRunner2cores(VmRunner):
     """
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             jobs_per_vm=2,
             memory_per_vm_mib=(2 * 1024),
         )
@@ -536,13 +555,19 @@ class DefaultVmRunnerV3(VmRunner):
     """
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             jobs_per_vm=1,
             memory_per_vm_mib=1024,
         )

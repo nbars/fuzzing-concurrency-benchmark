@@ -99,7 +99,7 @@ def prepare_runners(
     for runner_type in enabled_runner_types:
         for target in targets_artifacts:
             for job_cnt in job_cnt_configurations:
-                runner = runner_type(target, afl_config, job_cnt, timeout_s)
+                runner = runner_type(target, afl_config, job_cnt, timeout_s, custom_attrs)
                 log.info(f"Preparing runner {runner}")
                 try:
                     runner.prepare(purge=True)
@@ -218,8 +218,8 @@ def main():
     assert args.min_concurrent_jobs <= args.max_concurrent_jobs
     storage_path.mkdir(parents=True, exist_ok=True)
 
-    # custom_attrs = {"cpu": "2x_amd_epyc_9654"}
-    custom_attrs = {}
+    custom_attrs = {"cpu": "2x_amd_epyc_9654"}
+    #custom_attrs = {}
 
     # Right bound inclusive
     additional_jobs_step: t.Set[int] = args.additional_jobs_step

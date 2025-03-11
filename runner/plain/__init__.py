@@ -24,12 +24,13 @@ class AflRunnerBase(EvaluationRunner):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
         without_pinning: bool = False,
         with_turbo: bool = False,
     ) -> None:
         self._without_pinning = without_pinning
         self._with_turbo = with_turbo
-        super().__init__(target, afl_config, job_cnt, timeout_s)
+        super().__init__(target, afl_config, job_cnt, timeout_s, custom_attrs)
 
     def prepare(self, purge: bool = False) -> bool:
         cmd = "echo core | sudo tee /proc/sys/kernel/core_pattern"
@@ -139,29 +140,49 @@ class AflRunnerBase(EvaluationRunner):
 class AflRunner(AflRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
-        super().__init__(target, afl_config, job_cnt, timeout_s, without_pinning=False)
+        super().__init__(
+            target, afl_config, job_cnt, timeout_s, custom_attrs, without_pinning=False
+        )
 
 
 class AflRunnerWithoutPin(AflRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
-        super().__init__(target, afl_config, job_cnt, timeout_s, without_pinning=True)
+        super().__init__(
+            target, afl_config, job_cnt, timeout_s, custom_attrs, without_pinning=True
+        )
 
 
 class AflRunnerTurbo(AflRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             without_pinning=False,
             with_turbo=True,
         )
@@ -170,13 +191,19 @@ class AflRunnerTurbo(AflRunnerBase):
 class AflRunnerWithoutPinTurbo(AflRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             without_pinning=True,
             with_turbo=True,
         )

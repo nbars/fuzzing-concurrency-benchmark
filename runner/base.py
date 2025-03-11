@@ -18,7 +18,7 @@ class EvaluationRunner(ABC):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
-        custom_attrs: t.Optional[t.Dict[str, str]] = None,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         self._target = target
         self._afl_config = afl_config

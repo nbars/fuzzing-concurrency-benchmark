@@ -30,11 +30,16 @@ class DockerRunnerBase(EvaluationRunner):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
         with_overlayfs: bool = True,
         num_proccesses_containers: int = 1,
         custom_container_flags: t.Optional[t.List[str]] = None,
     ) -> None:
+        if custom_attrs is None:
+            custom_attrs = {}
+
         custom_attrs = {
+            **custom_attrs,
             "with_overlayfs": str(with_overlayfs),
             "num_processes_per_container": str(num_proccesses_containers),
         }
@@ -315,12 +320,14 @@ class DockerRunner(DockerRunnerBase):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=True,
             num_proccesses_containers=1,
         )
@@ -337,12 +344,14 @@ class DockerRunnerNoOverlay(DockerRunnerBase):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
         )
@@ -354,13 +363,19 @@ class DockerRunnerSingleContainer(DockerRunnerBase):
     """
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=True,
             num_proccesses_containers=1000,
         )
@@ -372,13 +387,19 @@ class DockerRunnerSingleContainerNoOverlay(DockerRunnerBase):
     """
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         super().__init__(
             target,
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1000,
         )
@@ -386,7 +407,12 @@ class DockerRunnerSingleContainerNoOverlay(DockerRunnerBase):
 
 class DockerRunnerSingleContainerPriv(DockerRunnerBase):
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -396,6 +422,7 @@ class DockerRunnerSingleContainerPriv(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1000,
             custom_container_flags=flags,
@@ -404,7 +431,12 @@ class DockerRunnerSingleContainerPriv(DockerRunnerBase):
 
 class DockerRunnerSingleContainerNoOverlayPriv(DockerRunnerBase):
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -414,6 +446,7 @@ class DockerRunnerSingleContainerNoOverlayPriv(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1000,
             custom_container_flags=flags,
@@ -425,7 +458,12 @@ class DockerRunnerSingleContainerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoC
 ):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -443,6 +481,7 @@ class DockerRunnerSingleContainerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoC
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1000,
             custom_container_flags=flags,
@@ -460,6 +499,7 @@ class DockerRunnerNoOverlayNoPidNs(DockerRunnerBase):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--pid host",
@@ -470,6 +510,7 @@ class DockerRunnerNoOverlayNoPidNs(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
             custom_container_flags=flags,
@@ -487,6 +528,7 @@ class DockerRunnerNoOverlayNoCgroups(DockerRunnerBase):
         afl_config: AflConfig,
         job_cnt: int,
         timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--cgroupns=host",
@@ -497,6 +539,7 @@ class DockerRunnerNoOverlayNoCgroups(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
             custom_container_flags=flags,
@@ -506,7 +549,12 @@ class DockerRunnerNoOverlayNoCgroups(DockerRunnerBase):
 class DockerRunnerNoOverlayPriv(DockerRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -516,6 +564,7 @@ class DockerRunnerNoOverlayPriv(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
             custom_container_flags=flags,
@@ -525,7 +574,12 @@ class DockerRunnerNoOverlayPriv(DockerRunnerBase):
 class DockerRunnerPriv(DockerRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -535,6 +589,7 @@ class DockerRunnerPriv(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=True,
             num_proccesses_containers=1,
             custom_container_flags=flags,
@@ -544,7 +599,12 @@ class DockerRunnerPriv(DockerRunnerBase):
 class DockerRunnerPriv2Job(DockerRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -554,6 +614,7 @@ class DockerRunnerPriv2Job(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=True,
             num_proccesses_containers=2,
             custom_container_flags=flags,
@@ -563,7 +624,12 @@ class DockerRunnerPriv2Job(DockerRunnerBase):
 class DockerRunnerPriv4Job(DockerRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -573,6 +639,7 @@ class DockerRunnerPriv4Job(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=True,
             num_proccesses_containers=4,
             custom_container_flags=flags,
@@ -582,7 +649,12 @@ class DockerRunnerPriv4Job(DockerRunnerBase):
 class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCaps(DockerRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -595,6 +667,7 @@ class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCaps(DockerRunnerBase):
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
             custom_container_flags=flags,
@@ -604,7 +677,12 @@ class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCaps(DockerRunnerBase):
 class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNs(DockerRunnerBase):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -621,6 +699,7 @@ class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNs(DockerRunnerBase)
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
             custom_container_flags=flags,
@@ -632,7 +711,12 @@ class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup(
 ):
 
     def __init__(
-        self, target: BuildArtifact, afl_config: AflConfig, job_cnt: int, timeout_s: int
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
     ) -> None:
         flags = [
             "--privileged",
@@ -650,6 +734,7 @@ class DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup(
             afl_config,
             job_cnt,
             timeout_s,
+            custom_attrs,
             with_overlayfs=False,
             num_proccesses_containers=1,
             custom_container_flags=flags,
