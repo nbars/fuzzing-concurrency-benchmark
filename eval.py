@@ -93,6 +93,7 @@ def prepare_runners(
     enabled_runner_types: t.List[t.Type[EvaluationRunner]],
     afl_config: AflConfig,
     targets_artifacts: t.List[BuildArtifact],
+    custom_attrs: t.Optional[t.Dict[str, str]] = None,
 ) -> list[EvaluationRunner]:
     runners: t.List[EvaluationRunner] = []
     for runner_type in enabled_runner_types:
@@ -217,6 +218,9 @@ def main():
     assert args.min_concurrent_jobs <= args.max_concurrent_jobs
     storage_path.mkdir(parents=True, exist_ok=True)
 
+    # custom_attrs = {"cpu": "2x_amd_epyc_9654"}
+    custom_attrs = {}
+
     # Right bound inclusive
     additional_jobs_step: t.Set[int] = args.additional_jobs_step
     job_cnt_configurations_set = set(
@@ -275,6 +279,7 @@ def main():
         enabled_runner_types,
         afl_config,
         targets_artifacts,
+        custom_attrs=custom_attrs,
     )
 
     if build_only:
