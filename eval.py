@@ -18,6 +18,8 @@ from pathlib import Path
 from runner.base import EvaluationRunner
 from runner.plain import AflRunnerBase
 
+import util
+
 setup_root_logger()
 log = get_logger()
 
@@ -99,7 +101,9 @@ def prepare_runners(
     for runner_type in enabled_runner_types:
         for target in targets_artifacts:
             for job_cnt in job_cnt_configurations:
-                runner = runner_type(target, afl_config, job_cnt, timeout_s, custom_attrs)
+                runner = runner_type(
+                    target, afl_config, job_cnt, timeout_s, custom_attrs
+                )
                 log.info(f"Preparing runner {runner}")
                 try:
                     runner.prepare(purge=True)
@@ -127,21 +131,6 @@ def order_for_fast_exploration(data: t.List[int]) -> t.List[int]:
             queue.append((mid, end))
 
     return result
-
-
-def disable_turbo_and_set_performance():
-    subprocess.check_call(
-        "echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
-        shell=True,
-    )
-    subprocess.check_call(
-        "echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo",
-        shell=True,
-    )
-    subprocess.check_call(
-        "echo 1 | sudo tee /proc/sys/kernel/shm_rmid_forced",
-        shell=True,
-    )
 
 
 def main():
@@ -297,7 +286,9 @@ def main():
             )
             continue
 
-        disable_turbo_and_set_performance()
+        util.set_scaling_governor()
+        util.set_turbo(False)
+        util.set_shm_rmid_forced(True)
 
         log.info(f"Final results will be located at {job_storage}")
         try:

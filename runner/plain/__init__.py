@@ -1,17 +1,14 @@
-import os
-import shutil
 import signal
 import subprocess
-import textwrap
 import time
 import multiprocessing
 import typing as t
-from dataclasses import dataclass
 from pathlib import Path
 from builder import BuildArtifact
 from builder.aflpp import AflConfig
 from runner.base import EvaluationRunner
 from logger import get_logger
+import util
 
 log = get_logger()
 
@@ -52,10 +49,7 @@ class AflRunnerBase(EvaluationRunner):
             )
 
         if self._with_turbo:
-            subprocess.check_call(
-                "echo 0 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo",
-                shell=True,
-            )
+            util.set_turbo(True)
 
         env = {
             "AFL_NO_UI": "1",
