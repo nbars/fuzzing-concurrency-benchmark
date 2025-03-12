@@ -155,13 +155,13 @@ def main():
     main_parser.add_argument(
         "--additional-jobs-step",
         type=set,
-        default=set([52, 52 * 2]),
+        default=set([52, 52 * 2, 96, 96 * 2, 96 * 4]),
         help="",  # 52, 104
     )
     main_parser.add_argument(
         "--max-concurrent-jobs",
         type=range_limited_int(),
-        default=120,
+        default=192 * 2,
         help="The maximum number of jobs the test series is executed for.",
     )
     main_parser.add_argument(
@@ -174,7 +174,7 @@ def main():
         "--step-timeout",
         type=parse_time_as_s,
         default="30m",
-        help="The minimum number of jobs the test series is started with.",
+        help="Timeout for each individual run.",
     )
     main_parser.add_argument(
         "--build-only",
@@ -208,7 +208,7 @@ def main():
     storage_path.mkdir(parents=True, exist_ok=True)
 
     custom_attrs = {"cpu": "2x_amd_epyc_9654"}
-    #custom_attrs = {}
+    # custom_attrs = {"cpu": "2x_intel_gold_5320"}
 
     # Right bound inclusive
     additional_jobs_step: t.Set[int] = args.additional_jobs_step
@@ -240,18 +240,7 @@ def main():
     )
 
     # enabled_runner_types: list[type[EvaluationRunner]] = [rty for rty in args.runners]
-    enabled_runner_types: list[type[EvaluationRunner]] = [
-        docker.DockerRunnerBase,
-        docker.DockerRunnerNoOverlay,
-        docker.DockerRunnerNoOverlayPriv,
-        docker.DockerRunnerNoOverlayNoPidNs,
-        docker.DockerRunnerNoOverlayNoCgroups,
-        docker.DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCaps,
-        docker.DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNs,
-        docker.DockerRunnerNoOverlayPrivNoSeccompNoApparmoreAllCapsNoNsNoCgroup,
-        docker.DockerRunnerSingleContainer,
-        docker.DockerRunnerSingleContainerNoOverlay,
-    ]
+    enabled_runner_types: list[type[EvaluationRunner]] = [*plain.all()]
 
     afl_config = build_aflpp()
     targets_artifacts = build_targets(afl_config)
