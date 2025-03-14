@@ -45,7 +45,7 @@ def vagrant_cmd(
     return textwrap.dedent(cmd)
 
 
-class VmRunner(EvaluationRunner):
+class VmRunnerBase(EvaluationRunner):
     ALREADY_BUILD_CONFIGURATIONS = set()
 
     def __init__(
@@ -330,11 +330,11 @@ class VmRunner(EvaluationRunner):
         # Test each unique target + afl configuration once, such that it will not fail later during
         # running the actual evaluation.
         target_tuple = (self.target().name, self.afl_config().root().as_posix())
-        if False and target_tuple not in VmRunner.ALREADY_BUILD_CONFIGURATIONS:
+        if False and target_tuple not in VmRunnerBase.ALREADY_BUILD_CONFIGURATIONS:
             log.info(
                 f"Testing {target_tuple}, since is was prepared for the first time"
             )
-            VmRunner.ALREADY_BUILD_CONFIGURATIONS.add(target_tuple)
+            VmRunnerBase.ALREADY_BUILD_CONFIGURATIONS.add(target_tuple)
 
             log.info("Starting VMs. Test should terminate in 120s. If not, hit ctrl+c")
             # Start it once for testing.
@@ -453,31 +453,7 @@ class VmRunner(EvaluationRunner):
         return super().purge()
 
 
-class DefaultVmRunner(VmRunner):
-    """
-    The first version of the VmRunner that was booting all VMs at once.
-    While each VM started fuzzing as soon as it was booted.
-    This was replaced by DefaultVmRunnerV2, which first boots all VMs
-    and then starts fuzzing. This way the fuzzers are not slowed down by the
-    other VMs booting. This type was actually only used for naming and the
-    "old" implementation does not exists anymore.
-    """
-
-    def __init__(self) -> None:
-        raise RuntimeError(
-            "Use DefaultVmRunnerV2, this runner is deprecated and should not be used to generate new data!"
-        )
-
-
-class DefaultVmRunnerV2(VmRunner):
-    pass
-
-
-# Leaf some room for other stuff (in total we have 251Gi)
-TOTAL_MEM_MIB = 230 * 1024
-
-
-class VmRunner8cores(VmRunner):
+class VmRunner(VmRunnerBase):
 
     def __init__(
         self,
@@ -493,42 +469,12 @@ class VmRunner8cores(VmRunner):
             job_cnt,
             timeout_s,
             custom_attrs,
-            jobs_per_vm=8,
+            jobs_per_vm=1,
             memory_per_vm_mib=(8 * 1024),
         )
 
 
-class VmRunner8coresV2(VmRunner):
-    """
-    Compared to `VmRunner8cores` this one uses:
-    libvirt.cpu_mode = "host-model"
-    libvirt.clock_timer :name => 'rtc', :present => 'no', :tickpolicy => 'catchup'
-    libvirt.cputopology :sockets => '1', :cores => '{current_vm_job_cnt}', :threads => '1'
-    """
-
-    def __init__(
-        self,
-        target: BuildArtifact,
-        afl_config: AflConfig,
-        job_cnt: int,
-        timeout_s: int,
-        custom_attrs: t.Optional[t.Dict[str, str]],
-    ) -> None:
-        super().__init__(
-            target,
-            afl_config,
-            job_cnt,
-            timeout_s,
-            custom_attrs,
-            jobs_per_vm=8,
-            memory_per_vm_mib=(8 * 1024),
-        )
-
-
-class VmRunner2cores(VmRunner):
-    """
-    Same as `VmRunner8coresV2` but with 2 cores per VM.
-    """
+class VmRunner2cores(VmRunnerBase):
 
     def __init__(
         self,
@@ -549,10 +495,7 @@ class VmRunner2cores(VmRunner):
         )
 
 
-class DefaultVmRunnerV3(VmRunner):
-    """
-    Same as `VmRunner8coresV2` but with one core per machine.
-    """
+class VmRunner8cores(VmRunnerBase):
 
     def __init__(
         self,
@@ -568,6 +511,35 @@ class DefaultVmRunnerV3(VmRunner):
             job_cnt,
             timeout_s,
             custom_attrs,
-            jobs_per_vm=1,
-            memory_per_vm_mib=1024,
+            jobs_per_vm=8,
+            memory_per_vm_mib=(8 * 1024),
         )
+
+
+class VmRunner32cores(VmRunnerBase):
+
+    def __init__(
+        self,
+        target: BuildArtifact,
+        afl_config: AflConfig,
+        job_cnt: int,
+        timeout_s: int,
+        custom_attrs: t.Optional[t.Dict[str, str]],
+    ) -> None:
+        super().__init__(
+            target,
+            afl_config,
+            job_cnt,
+            timeout_s,
+            custom_attrs,
+            jobs_per_vm=32,
+            memory_per_vm_mib=(32 * 1024),
+        )
+
+
+def all() -> t.List[t.Type[VmRunnerBase]]:
+    ret = []
+    for _k, v in globals().items():
+        if isinstance(v, type) and issubclass(v, VmRunnerBase) and v != VmRunnerBase:
+            ret.append(v)
+    return ret
