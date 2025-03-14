@@ -12,18 +12,22 @@ def set_scaling_governor(governor: str = "performance"):
 def set_turbo(enabled: bool):
     intel_no_turbo_file = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
     if intel_no_turbo_file.exists():
+        enabled_str = "0" if enabled else "1"
         subprocess.check_call(
-            f"echo {("1", "0")[enabled]} | sudo tee {intel_no_turbo_file.as_posix()}",
+            f"echo {enabled_str} | sudo tee {intel_no_turbo_file.as_posix()}",
             shell=True,
         )
     else:
+        enabled_str = "1" if enabled else "0"
         subprocess.check_call(
-            f"echo {("0", "1")[enabled]} | sudo tee /sys/devices/system/cpu/cpufreq/boost",
+            f"echo {enabled_str} | sudo tee /sys/devices/system/cpu/cpufreq/boost",
             shell=True,
         )
 
+
 def set_shm_rmid_forced(enabled: bool):
+    enabled_str = "1" if enabled else "0"
     subprocess.check_call(
-        f"echo {("0", "1")[enabled]} | sudo tee /proc/sys/kernel/shm_rmid_forced",
+        f"echo {enabled_str} | sudo tee /proc/sys/kernel/shm_rmid_forced",
         shell=True,
     )
