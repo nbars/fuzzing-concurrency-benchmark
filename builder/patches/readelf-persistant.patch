@@ -1,0 +1,173 @@
+diff --git a/binutils/readelf.c b/binutils/readelf.c
+index 5d1cf9c3388..40bb9bd45c8 100644
+--- a/binutils/readelf.c
++++ b/binutils/readelf.c
+@@ -180,6 +180,8 @@
+ #define offsetof(TYPE, MEMBER) ((size_t) &(((TYPE *) 0)->MEMBER))
+ #endif
+ 
++__AFL_FUZZ_INIT();
++
+ typedef struct elf_section_list
+ {
+   Elf_Internal_Shdr *        hdr;
+@@ -24129,84 +24131,87 @@ process_file (char * file_name)
+   char armag[SARMAG];
+   bool ret = true;
+ 
+-  if (stat (file_name, &statbuf) < 0)
+-    {
+-      if (errno == ENOENT)
+-	error (_("'%s': No such file\n"), file_name);
+-      else
+-	error (_("Could not locate '%s'.  System error message: %s\n"),
+-	       file_name, strerror (errno));
+-      return false;
+-    }
+-
+-  if (! S_ISREG (statbuf.st_mode))
+-    {
+-      error (_("'%s' is not an ordinary file\n"), file_name);
+-      return false;
+-    }
+-
+-  filedata = calloc (1, sizeof * filedata);
+-  if (filedata == NULL)
+-    {
+-      error (_("Out of memory allocating file data structure\n"));
+-      return false;
+-    }
+-
+-  filedata->file_name = file_name;
+-  filedata->handle = fopen (file_name, "rb");
+-  if (filedata->handle == NULL)
+-    {
+-      error (_("Input file '%s' is not readable.\n"), file_name);
+-      free (filedata);
+-      return false;
+-    }
+-
+-  if (fread (armag, SARMAG, 1, filedata->handle) != 1)
+-    {
+-      error (_("%s: Failed to read file's magic number\n"), file_name);
+-      fclose (filedata->handle);
+-      free (filedata);
+-      return false;
+-    }
++  // if (stat (file_name, &statbuf) < 0)
++  //   {
++  //     if (errno == ENOENT)
++	// error (_("'%s': No such file\n"), file_name);
++  //     else
++	// error (_("Could not locate '%s'.  System error message: %s\n"),
++	//        file_name, strerror (errno));
++  //     return false;
++  //   }
++
++  // if (! S_ISREG (statbuf.st_mode))
++  //   {
++  //     error (_("'%s' is not an ordinary file\n"), file_name);
++  //     return false;
++  //   }
++
++#ifdef __AFL_HAVE_MANUAL_CONTROL
++  __AFL_INIT();
++#endif
+ 
+-  filedata->file_size = statbuf.st_size;
+-  filedata->is_separate = false;
++  // if (filedata == NULL)
++  //   {
++  //     error (_("Out of memory allocating file data structure\n"));
++  //     return false;
++  //   }
++
++  while (__AFL_LOOP(100000)) {
++    filedata = calloc (1, sizeof(*filedata));
++    assert(filedata);
++    FILE *fuzzing_input = fmemopen(__AFL_FUZZ_TESTCASE_BUF, __AFL_FUZZ_TESTCASE_LEN, "r");
++    assert(fuzzing_input);
++    filedata->file_name = "INPUT";
++    filedata->handle = fuzzing_input;
++
++    if (fread (armag, SARMAG, 1, filedata->handle) != 1)
++      {
++        error (_("%s: Failed to read file's magic number\n"), file_name);
++        fclose (filedata->handle);
++        free (filedata);
++        return false;
++      }
+ 
+-  if (memcmp (armag, ARMAG, SARMAG) == 0)
+-    {
+-      if (! process_archive (filedata, false))
+-	ret = false;
+-    }
+-  else if (memcmp (armag, ARMAGT, SARMAG) == 0)
+-    {
+-      if ( ! process_archive (filedata, true))
+-	ret = false;
+-    }
+-  else
+-    {
+-      if (do_archive_index && !check_all)
+-	error (_("File %s is not an archive so its index cannot be displayed.\n"),
+-	       file_name);
++    filedata->file_size = __AFL_FUZZ_TESTCASE_LEN;
++    filedata->is_separate = false;
+ 
+-      rewind (filedata->handle);
+-      filedata->archive_file_size = filedata->archive_file_offset = 0;
++    if (memcmp (armag, ARMAG, SARMAG) == 0)
++      {
++        if (! process_archive (filedata, false))
++    ret = false;
++      }
++    else if (memcmp (armag, ARMAGT, SARMAG) == 0)
++      {
++        if ( ! process_archive (filedata, true))
++    ret = false;
++      }
++    else
++      {
++        if (do_archive_index && !check_all)
++    error (_("File %s is not an archive so its index cannot be displayed.\n"),
++          file_name);
+ 
+-      if (! process_object (filedata))
+-	ret = false;
+-    }
++        rewind (filedata->handle);
++        filedata->archive_file_size = filedata->archive_file_offset = 0;
+ 
+-  fclose (filedata->handle);
+-  free (filedata->section_headers);
+-  free (filedata->program_headers);
+-  free (filedata->string_table);
+-  free (filedata->dump.dump_sects);
+-  free (filedata);
++        if (! process_object (filedata))
++    ret = false;
++      }
+ 
+-  free (ba_cache.strtab);
+-  ba_cache.strtab = NULL;
+-  free (ba_cache.symtab);
+-  ba_cache.symtab = NULL;
+-  ba_cache.filedata = NULL;
++    fclose (filedata->handle);
++    free (filedata->section_headers);
++    free (filedata->program_headers);
++    free (filedata->string_table);
++    free (filedata->dump.dump_sects);
++    free (filedata);
++
++    free (ba_cache.strtab);
++    ba_cache.strtab = NULL;
++    free (ba_cache.symtab);
++    ba_cache.symtab = NULL;
++    ba_cache.filedata = NULL;
++  }
+ 
+   return ret;
+ }
