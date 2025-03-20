@@ -44,6 +44,10 @@ class Builder(ABC):
         return Path(__file__).parent / "build-dirs" / suffix
 
     @staticmethod
+    def get_patches_dir() -> Path:
+        return Path(__file__).parent / "patches"
+
+    @staticmethod
     def get_build_env() -> t.Dict[str, str]:
         env = os.environ.copy()
         env["DEBIAN_FRONTEND"] = "noninteractive"

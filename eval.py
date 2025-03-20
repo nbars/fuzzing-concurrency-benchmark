@@ -11,7 +11,7 @@ import enum
 from abc import ABC, abstractmethod
 from builder import BuildArtifact
 from builder.aflpp import AflConfig, AflppBuilder
-from builder.readelf import ReadelfBuilder
+from builder.readelf import ReadelfBuilder, ReadelfPersistantBuilder
 from logger import get_logger, setup_root_logger
 from pathlib import Path
 
@@ -55,6 +55,7 @@ def build_targets(afl_config: AflConfig) -> list[BuildArtifact]:
     # Build all targets locally
     target_builder = [
         ReadelfBuilder(afl_config.afl_cc(), afl_config.afl_cxx()),
+        ReadelfPersistantBuilder(afl_config.afl_cc(), afl_config.afl_cxx()),
     ]
 
     targets_artifacts: t.List[BuildArtifact] = []
@@ -161,7 +162,7 @@ def main():
     main_parser.add_argument(
         "--max-concurrent-jobs",
         type=range_limited_int(),
-        default=192 * 2,
+        default=192 * 3,
         help="The maximum number of jobs the test series is executed for.",
     )
     main_parser.add_argument(
@@ -178,7 +179,7 @@ def main():
     )
     main_parser.add_argument(
         "--build-only",
-        type=bool,
+        action="store_true",
         default=False,
         help="Only build the target without performing any experiment.",
     )
