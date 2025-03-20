@@ -5,7 +5,7 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 @@ -180,6 +180,8 @@
  #define offsetof(TYPE, MEMBER) ((size_t) &(((TYPE *) 0)->MEMBER))
  #endif
- 
+
 +__AFL_FUZZ_INIT();
 +
  typedef struct elf_section_list
@@ -14,7 +14,7 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 @@ -24129,84 +24131,87 @@ process_file (char * file_name)
    char armag[SARMAG];
    bool ret = true;
- 
+
 -  if (stat (file_name, &statbuf) < 0)
 -    {
 -      if (errno == ENOENT)
@@ -73,7 +73,7 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 +#ifdef __AFL_HAVE_MANUAL_CONTROL
 +  __AFL_INIT();
 +#endif
- 
+
 -  filedata->file_size = statbuf.st_size;
 -  filedata->is_separate = false;
 +  // if (filedata == NULL)
@@ -97,7 +97,7 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 +        free (filedata);
 +        return false;
 +      }
- 
+
 -  if (memcmp (armag, ARMAG, SARMAG) == 0)
 -    {
 -      if (! process_archive (filedata, false))
@@ -115,7 +115,7 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 -	       file_name);
 +    filedata->file_size = __AFL_FUZZ_TESTCASE_LEN;
 +    filedata->is_separate = false;
- 
+
 -      rewind (filedata->handle);
 -      filedata->archive_file_size = filedata->archive_file_offset = 0;
 +    if (memcmp (armag, ARMAG, SARMAG) == 0)
@@ -133,13 +133,13 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 +        if (do_archive_index && !check_all)
 +    error (_("File %s is not an archive so its index cannot be displayed.\n"),
 +          file_name);
- 
+
 -      if (! process_object (filedata))
 -	ret = false;
 -    }
 +        rewind (filedata->handle);
 +        filedata->archive_file_size = filedata->archive_file_offset = 0;
- 
+
 -  fclose (filedata->handle);
 -  free (filedata->section_headers);
 -  free (filedata->program_headers);
@@ -149,7 +149,7 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 +        if (! process_object (filedata))
 +    ret = false;
 +      }
- 
+
 -  free (ba_cache.strtab);
 -  ba_cache.strtab = NULL;
 -  free (ba_cache.symtab);
@@ -168,6 +168,6 @@ index 5d1cf9c3388..40bb9bd45c8 100644
 +    ba_cache.symtab = NULL;
 +    ba_cache.filedata = NULL;
 +  }
- 
+
    return ret;
  }
