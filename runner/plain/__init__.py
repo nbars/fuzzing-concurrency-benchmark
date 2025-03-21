@@ -111,6 +111,7 @@ class AflRunnerBase(EvaluationRunner):
                     j.wait()
                     log.info(f"Target {j.pid} terminate")
                 # afl++ sometimes fails to kill their childs :)
+                subprocess.run("pkill -9 -P $(pgrep afl-fuzz)", shell=True, check=False)
                 subprocess.run("pkill -9 afl-fuzz", shell=True, check=False)
                 deadline = time.monotonic() + 10
                 while time.monotonic() < deadline:
