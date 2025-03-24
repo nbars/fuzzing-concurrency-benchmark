@@ -241,7 +241,13 @@ def main():
     )
 
     # enabled_runner_types: list[type[EvaluationRunner]] = [rty for rty in args.runners]
-    enabled_runner_types: list[type[EvaluationRunner]] = [*plain.all()]
+    enabled_runner_types: list[type[EvaluationRunner]] = [
+        *plain.all(),
+        docker.DockerRunner,
+        docker.DockerRunnerPriv,
+        docker.DockerRunnerSingleContainer,
+        docker.DockerRunnerSingleContainerPriv,
+    ]
 
     afl_config = build_aflpp()
     targets_artifacts = build_targets(afl_config)
