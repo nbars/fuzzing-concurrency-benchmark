@@ -228,7 +228,7 @@ data_frame = pd.DataFrame(data_frame_dict)
 
 
 def plot_for_runner(
-    data_frame: pd.DataFrame, save_name: str, runners: t.Optional[t.List[str]] = None
+    data_frame: pd.DataFrame, save_name: str, runners: t.Optional[t.List[str]] = None, cpus: t.Optional[t.List[str]] = None
 ) -> alt.LayerChart:
     max_job_cnt = 96 * 4
     selection = alt.selection_point(fields=["runner_name"], bind="legend")
@@ -262,6 +262,11 @@ def plot_for_runner(
             alt.FieldOneOfPredicate(field="runner_name", oneOf=runners)
         )
 
+    if cpus:
+        lines = lines.transform_filter(
+            alt.FieldOneOfPredicate(field="cpu", oneOf=cpus)
+        )
+
     num_cores_ruler_52 = (
         alt.Chart(pd.DataFrame({"x": [52]})).mark_rule(color="green").encode(x="x:Q")
     )
@@ -287,6 +292,7 @@ def plot_for_runner(
         titleFontSize=14, labelFontSize=9, labelLimit=0, orient="right"
     )
 
+    chart.save(graphs_dir / f"{save_name}.svg", scale_factor=3.0)
     chart.save(graphs_dir / f"{save_name}.png", scale_factor=3.0)
     chart.save(graphs_dir / f"{save_name}.html", scale_factor=5.0)
     return chart
@@ -298,14 +304,17 @@ def plot_for_runner(
 
 print("[+] Afl runners plot")
 # runner_names = [r for r in all_runner_names if "Afl" in r]
-data_frame = data_frame[data_frame["target_name"] == "readelf-persistante"]
+data_frame = data_frame[data_frame["target_name"] == "readelf"] # readelf-persistante
 # runner_names = ["AflRunner", "AflRunnerTurbo", "AflRunnerWithoutPin"]
 runner_names = [
     "AflRunner",
     "DockerRunner",
     "DockerRunnerPriv",
 ]
-chart = plot_for_runner(data_frame, "afl", runners=runner_names)
+cpus = [
+    "2x_intel_gold_5320",
+]
+chart = plot_for_runner(data_frame, "afl", runners=runner_names, cpus=cpus)
 chart.show()
 
 # print("[+] Docker runners plot")
